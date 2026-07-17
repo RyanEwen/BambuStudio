@@ -6,7 +6,10 @@ if(DEFINED OPENSSL_ARCH)
     set(_cross_arch ${OPENSSL_ARCH})
 else()
     if(WIN32)
-        if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "ARM64")
+        # Detect ARM64 whether the platform arrived as -A ARM64 (CI) or -A arm64
+        # (build_win.bat lowercases it), and also honour the native host CPU.
+        string(TOUPPER "${CMAKE_GENERATOR_PLATFORM}" _win_gen_platform)
+        if(_win_gen_platform STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
             set(_cross_arch "VC-WIN64-ARM")
         else()
             set(_cross_arch "VC-WIN64A")
