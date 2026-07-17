@@ -42,16 +42,16 @@ jobs:
           key: ${{ inputs.cache-key }}
 
       - name: setup dev on Windows
-        if: inputs.os == 'windows-latest'
+        if: startsWith(inputs.os, 'windows')
         uses: microsoft/setup-msbuild@v2
 
       - name: Get the date on Ubuntu and macOS
-        if: inputs.os != 'windows-latest'
+        if: ${{ !startsWith(inputs.os, 'windows') }}
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_ENV
         shell: bash
 
       - name: Get the date on Windows
-        if: inputs.os == 'windows-latest'
+        if: startsWith(inputs.os, 'windows')
         run: echo "date=$(Get-Date -Format 'yyyyMMdd')" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
         shell: pwsh
 
@@ -73,6 +73,28 @@ jobs:
         if: inputs.os == 'windows-latest'
         working-directory: ${{ github.workspace }}
         run: Compress-Archive -Path "${{ github.workspace }}\deps\build\BambuStudio_dep\*" -DestinationPath "${{ github.workspace }}\deps\build\BambuStudio_dep_win64_${{ env.date }}_vs2022.zip"
+        shell: pwsh
+
+      # Windows on ARM64. The windows-11-arm runner ships Visual Studio 2022
+      # (v17), not 2026, so the generator differs from the x64 job above. The
+      # GMP/MPFR/OpenSSL/Boost ARM64 dep handling lives in deps/*.cmake and is
+      # selected automatically from -A ARM64 (CMAKE_GENERATOR_PLATFORM).
+      - name: Build on Windows ARM64
+        if: inputs.os == 'windows-11-arm'
+        working-directory: ${{ github.workspace }}
+        run: |
+            choco install strawberryperl
+            choco install pkgconfiglite
+            mkdir ${{ github.workspace }}\deps\build
+            mkdir ${{ github.workspace }}\deps\build\BambuStudio_dep
+            cd "${{ github.workspace }}\deps\build"
+            cmake ../ -G "Visual Studio 17 2022" -A ARM64 -DDESTDIR="./BambuStudio_dep" -DCMAKE_BUILD_TYPE=Release -DDEP_DEBUG=OFF
+            msbuild /m ALL_BUILD.vcxproj
+
+      - name: pack deps on Windows ARM64
+        if: inputs.os == 'windows-11-arm'
+        working-directory: ${{ github.workspace }}
+        run: Compress-Archive -Path "${{ github.workspace }}\deps\build\BambuStudio_dep\*" -DestinationPath "${{ github.workspace }}\deps\build\BambuStudio_dep_win-arm64_${{ env.date }}_vs2022.zip"
         shell: pwsh
           
       - name: Fix python install error on mac
@@ -165,6 +187,13 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: BambuStudio_dep_win64_${{ env.date }}
+          path: ${{ github.workspace }}/deps/build/BambuStudio_dep*.zip
+
+      - name: Upload Windows ARM64 artifacts
+        if: inputs.os == 'windows-11-arm'
+        uses: actions/upload-artifact@v6
+        with:
+          name: BambuStudio_dep_win-arm64_${{ env.date }}
           path: ${{ github.workspace }}/deps/build/BambuStudio_dep*.zip
 
       - name: Upload Ubuntu artifacts
