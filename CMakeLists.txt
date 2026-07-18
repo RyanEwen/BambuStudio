@@ -84,6 +84,15 @@ elseif (MSVC)
             message(STATUS " is cross compile set to true.............")
             set(IS_CROSS_COMPILE TRUE)
         endif ()
+        if (CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64EC")
+            # On ARM64EC the x86 SIMD headers (immintrin.h etc.) refuse direct
+            # inclusion - they must come via <intrin.h> so the softintrin
+            # emulation layer is set up first. Several bundled libraries
+            # (eigen, imgui, clipper2, tinybvh, libigl, minih264) include them
+            # directly, so force-include intrin.h globally instead of patching
+            # each one.
+            add_compile_options(/FIintrin.h)
+        endif ()
 endif ()
 
 # Proposal for C++ unit tests and sandboxes
