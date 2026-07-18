@@ -2,7 +2,14 @@ set(_srcdir ${CMAKE_CURRENT_LIST_DIR}/mpfr)
 set(_dstdir ${DESTDIR}/usr/local)
 
 if (MSVC)
-    if ((CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$") OR (CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64"))
+    # Prefer the generator platform (-A ...) over the host processor so that an
+    # ARM64 host building an x64 (or ARM64EC) target stages the right blobs.
+    set(_mpfr_plat "${CMAKE_GENERATOR_PLATFORM}")
+    if (NOT _mpfr_plat)
+        set(_mpfr_plat "${CMAKE_SYSTEM_PROCESSOR}")
+    endif ()
+    string(TOUPPER "${_mpfr_plat}" _mpfr_plat)
+    if (_mpfr_plat MATCHES "^(ARM64|AARCH64)$")
         set(_output  ${_dstdir}/include/mpfr.h
                  ${_dstdir}/include/mpf2mpfr.h
                  ${_dstdir}/lib/libmpfr-6.lib

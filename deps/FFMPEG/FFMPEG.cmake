@@ -8,8 +8,14 @@ if (MSVC)
     # names match what the x64 package ships and what the code links against.
     set(_ffmpeg_msvc_url "https://github.com/bambulab/ffmpeg_prebuilts/releases/download/7.0.2/7.0.2_msvc.zip")
     set(_ffmpeg_msvc_hash "SHA256=DF44AE6B97CE84C720695AE7F151B4A9654915D1841C68F10D62A1189E0E7181")
-    string(TOUPPER "${CMAKE_GENERATOR_PLATFORM}" _ffmpeg_gen_platform)
-    if (_ffmpeg_gen_platform STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+    # Generator platform takes precedence over the host processor so an ARM64
+    # host can still build x64 deps (and ARM64EC targets get the x64 package).
+    set(_ffmpeg_gen_platform "${CMAKE_GENERATOR_PLATFORM}")
+    if (NOT _ffmpeg_gen_platform)
+        set(_ffmpeg_gen_platform "${CMAKE_SYSTEM_PROCESSOR}")
+    endif ()
+    string(TOUPPER "${_ffmpeg_gen_platform}" _ffmpeg_gen_platform)
+    if (_ffmpeg_gen_platform MATCHES "^(ARM64|AARCH64)$")
         set(_ffmpeg_msvc_url "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-17-13-22/ffmpeg-n7.1.5-2-g998de74adf-winarm64-gpl-shared-7.1.zip")
         set(_ffmpeg_msvc_hash "SHA256=37e39b6f9115ec01a0ac6d7728e629e6be988d42495c850da4514930ad857f97")
     endif ()

@@ -533,9 +533,21 @@ if(MSVC AND NOT DEFINED OpenCV_ARCH)
     # Select the arch explicitly for any spelling of an ARM64 target. The dispatcher
     # only honours pre-set values when BOTH OpenCV_ARCH and OpenCV_RUNTIME are
     # defined, so pin the runtime too (our deps build installs the vc17 layout).
-    string(TOUPPER "${CMAKE_GENERATOR_PLATFORM}" _slic3r_gen_platform)
-    if(_slic3r_gen_platform STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+    set(_slic3r_gen_platform "${CMAKE_GENERATOR_PLATFORM}")
+    if(NOT _slic3r_gen_platform)
+        set(_slic3r_gen_platform "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    string(TOUPPER "${_slic3r_gen_platform}" _slic3r_gen_platform)
+    if(_slic3r_gen_platform MATCHES "^(ARM64|AARCH64)$")
         set(OpenCV_ARCH ARM64)
+        if(NOT DEFINED OpenCV_RUNTIME)
+            set(OpenCV_RUNTIME vc17)
+        endif()
+    elseif(_slic3r_gen_platform STREQUAL "ARM64EC")
+        # ARM64EC links the x64 dependency set (EC and x64 code interoperate),
+        # so select the x64 OpenCV layout. MSVC 19.4x also falls in a gap in
+        # OpenCV 4.6's runtime table, so the runtime must be pinned here too.
+        set(OpenCV_ARCH x64)
         if(NOT DEFINED OpenCV_RUNTIME)
             set(OpenCV_RUNTIME vc17)
         endif()

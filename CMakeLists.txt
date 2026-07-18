@@ -636,7 +636,15 @@ function(bambustudio_copy_dlls target config postfix output_dlls)
         set(_bits 32)
     endif ()
 
-    if ((CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$") OR (CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64"))
+    # Generator platform takes precedence over the host processor so an ARM64
+    # host can build x64 or ARM64EC targets (both consume the x64 runtime DLLs;
+    # ARM64EC processes load x64 DLLs via emulation).
+    set(_copydll_plat "${CMAKE_GENERATOR_PLATFORM}")
+    if (NOT _copydll_plat)
+        set(_copydll_plat "${CMAKE_SYSTEM_PROCESSOR}")
+    endif ()
+    string(TOUPPER "${_copydll_plat}" _copydll_plat)
+    if (_copydll_plat MATCHES "^(ARM64|AARCH64)$")
         set(_gmpdll win_arm64/gmp-10.dll)
         set(_mpfrdll win_arm64/mpfr-6.dll)
         set(output_gmpdll gmp-10.dll)

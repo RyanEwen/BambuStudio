@@ -52,6 +52,11 @@ else ()
 
     if (DEP_ARCH STREQUAL "ARM64")
         set(DEP_PLATFORM "ARM64")
+    elseif (DEP_ARCH STREQUAL "ARM64EC")
+        # ARM64EC: native ARM64 code with an x64-compatible ABI, so an ARM64EC
+        # app can link these deps AND load x64-only DLLs (e.g. the Bambu
+        # network plugin) in-process. CMake-based deps build with -A ARM64EC.
+        set(DEP_PLATFORM "ARM64EC")
     else ()
         set(DEP_PLATFORM "x64")
     endif ()
