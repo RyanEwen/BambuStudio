@@ -49,6 +49,8 @@ jobs:
           - os: windows-latest
           - os: windows-11-arm
             arch: arm64
+          - os: windows-11-arm
+            arch: arm64ec
           - os: macos-15-intel
             arch: x86_64
           - os: macos-15
