@@ -9,6 +9,10 @@ bambustudio_add_cmake_project(
     PATCH_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_LIST_DIR}/patch_tbb.cmake
     CMAKE_ARGS
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        # ARM64EC: /FIintrin.h makes cl warn C4163 for x86-only intrinsics
+        # (__rdtsc, _mm_mfence) that softintrin handles at link time; TBB's
+        # default warnings-as-errors turns those fatal.
+        -DTBB_STRICT=OFF
         -DTBB_BUILD_SHARED=OFF
         -DTBB_BUILD_TESTS=OFF
         -DTBB_TEST=OFF
