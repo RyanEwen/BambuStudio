@@ -145,7 +145,19 @@ if (MSVC)
     # /bigobj (Increase Number of Sections in .Obj file)
     # error C3859: virtual memory range for PCH exceeded; please recompile with a command line option of '-Zm90' or greater
     # Generate symbols at every build target, even for the release.
-    add_compile_options(-bigobj -Zm520 /Zi)
+    if (CMAKE_GENERATOR MATCHES "Ninja")
+        # /Z7 embeds debug info in the objects instead of writing per-target
+        # .pdb files during compilation: /Zi's shared-PDB writes fail with
+        # C1041 under Ninja's parallelism (the VS generator serializes them
+        # via /FS+mspdbsrv) and defeat compiler-launcher caches like sccache.
+        # Only debug-carrying configs get it - embedding into every object of
+        # a Release build pushes libslic3r_gui.lib past the 4 GB .lib format
+        # limit (LNK1248), and plain Release omits debug info in standard
+        # CMake semantics anyway.
+        add_compile_options(-bigobj -Zm520 "$<$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>:/Z7>")
+    else ()
+        add_compile_options(-bigobj -Zm520 /Zi)
+    endif ()
     # Disable STL4007: Many result_type typedefs and all argument_type, first_argument_type, and second_argument_type typedefs are deprecated in C++17.
     #FIXME Remove this line after eigen library adapts to the new C++17 adaptor rules.
     add_compile_options(-D_SILENCE_CXX17_ADAPTOR_TYPEDEFS_DEPRECATION_WARNING)
