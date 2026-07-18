@@ -544,10 +544,19 @@ if(MSVC AND NOT DEFINED OpenCV_ARCH)
             set(OpenCV_RUNTIME vc17)
         endif()
     elseif(_slic3r_gen_platform STREQUAL "ARM64EC")
-        # ARM64EC links the x64 dependency set (EC and x64 code interoperate),
-        # so select the x64 OpenCV layout. MSVC 19.4x also falls in a gap in
-        # OpenCV 4.6's runtime table, so the runtime must be pinned here too.
+        # ARM64EC consumes either dependency flavor (EC and x64 code
+        # interoperate): the in-repo ARM64EC deps bundle installs OpenCV under
+        # ARM64/vc17 (its recipe treats EC like arm64), while an x64 deps
+        # prefix uses x64/vc17. Pick whichever layout the prefix provides.
+        # MSVC 19.4x also falls in a gap in OpenCV 4.6's runtime table, so the
+        # runtime must be pinned here too.
         set(OpenCV_ARCH x64)
+        foreach(_slic3r_prefix ${CMAKE_PREFIX_PATH})
+            if(EXISTS "${_slic3r_prefix}/ARM64/vc17")
+                set(OpenCV_ARCH ARM64)
+            endif()
+        endforeach()
+        unset(_slic3r_prefix)
         if(NOT DEFINED OpenCV_RUNTIME)
             set(OpenCV_RUNTIME vc17)
         endif()
