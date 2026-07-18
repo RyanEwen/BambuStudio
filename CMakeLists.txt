@@ -92,6 +92,10 @@ elseif (MSVC)
             # directly, so force-include intrin.h globally instead of patching
             # each one.
             add_compile_options(/FIintrin.h)
+            # Software implementations of x86 intrinsics that have no native
+            # ARM64EC lowering (e.g. _mm_cvtsd_si64). MSBuild does not add this
+            # automatically for CMake-generated projects.
+            add_link_options(softintrin.lib)
         endif ()
 endif ()
 
