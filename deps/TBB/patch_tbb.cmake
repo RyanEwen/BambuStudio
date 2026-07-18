@@ -29,6 +29,43 @@ else()
     message(FATAL_ERROR "[TBB patch] not found: ${_msvc_cmake}")
 endif()
 
+# 3. Provide link-time definitions of the TSX intrinsics for ARM64EC builds.
+#    rtm_mutex.cpp/rtm_rw_mutex.cpp call _xbegin/_xend/_xabort unconditionally;
+#    on ARM64EC those lower to extern calls with no softintrin implementation.
+#    The code paths are unreachable at runtime (the governor only enables RTM
+#    when CPUID reports TSX, which the x64 emulator never does), but the
+#    symbols must resolve. A separate stub TU avoids touching the RTM sources.
+set(_stub "src/tbb/arm64ec_tsx_stub.cpp")
+set(_tbb_cml "src/tbb/CMakeLists.txt")
+if(NOT EXISTS "${_stub}")
+    file(WRITE "${_stub}" [=[
+// Link-time stubs for Intel TSX intrinsics on ARM64EC (no hardware TSX, no
+// softintrin fallback). Unreachable at runtime: TBB only takes RTM paths when
+// CPUID reports TSX support, which the x64/EC emulator never does.
+#if defined(_M_ARM64EC)
+extern "C" unsigned int _xbegin(void) { return 0u; /* abort, no retry */ }
+extern "C" void _xend(void) {}
+extern "C" void _xabort(unsigned int) {}
+#endif
+]=])
+    message(STATUS "[TBB patch] wrote ${_stub}")
+endif()
+if(EXISTS "${_tbb_cml}")
+    file(READ "${_tbb_cml}" _content)
+    if(_content MATCHES "arm64ec_tsx_stub")
+        message(STATUS "[TBB patch] stub already registered")
+    else()
+        string(REPLACE "rtm_mutex.cpp" "rtm_mutex.cpp\n    arm64ec_tsx_stub.cpp" _patched "${_content}")
+        if(_patched STREQUAL _content)
+            message(FATAL_ERROR "[TBB patch] failed to register stub in ${_tbb_cml}")
+        endif()
+        file(WRITE "${_tbb_cml}" "${_patched}")
+        message(STATUS "[TBB patch] registered arm64ec_tsx_stub.cpp")
+    endif()
+else()
+    message(FATAL_ERROR "[TBB patch] not found: ${_tbb_cml}")
+endif()
+
 set(_config_h "include/oneapi/tbb/detail/_config.h")
 if(EXISTS "${_config_h}")
     file(READ "${_config_h}" _content)

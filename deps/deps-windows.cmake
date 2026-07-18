@@ -66,6 +66,20 @@ set(DEP_CMAKE_OPTS "-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
 if (DEP_PLATFORM STREQUAL "ARM64")
     list(APPEND DEP_CMAKE_OPTS "-DCMAKE_SYSTEM_PROCESSOR=ARM64")
 endif ()
+if (DEP_PLATFORM STREQUAL "ARM64EC")
+    # ARM64EC defines _M_X64, and the x86 SIMD headers (emmintrin.h etc.)
+    # refuse direct inclusion there - they must arrive via <intrin.h> so the
+    # softintrin emulation layer is set up first; /FIintrin.h forces that for
+    # third-party code that includes them directly. /FI in turn breaks the
+    # common "#define _CRT_SECURE_NO_WARNINGS before includes" idiom (the CRT
+    # headers are already in), so silence C4996/C4005 which several deps
+    # (boost.nowide among them) promote to errors. The flag strings must
+    # restate CMake's default MSVC flags: CMAKE_ARGS replaces, not appends,
+    # and losing /EHsc breaks any dep that requires exception handling.
+    list(APPEND DEP_CMAKE_OPTS
+        "-DCMAKE_C_FLAGS=/DWIN32 /D_WINDOWS /W3 /wd4996 /wd4005 /FIintrin.h"
+        "-DCMAKE_CXX_FLAGS=/DWIN32 /D_WINDOWS /W3 /GR /EHsc /wd4996 /wd4005 /FIintrin.h")
+endif ()
 
 if (${DEP_DEBUG})
     set(DEP_BOOST_DEBUG "debug")
