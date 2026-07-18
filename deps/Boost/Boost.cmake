@@ -29,6 +29,18 @@ if (MSVC)
         set(_context_arch_line "-DBOOST_CONTEXT_ARCHITECTURE:STRING=arm64")
         set(_context_impl_line "-DBOOST_CONTEXT_IMPLEMENTATION:STRING=winfib")
         message(STATUS "BOOST param: ${_context_abi_line} ${_context_arch_line} ${_context_impl_line}")
+    elseif (_msvc_target_arch STREQUAL "ARM64EC")
+        # ARM64EC uses the x64-compatible ABI; the Windows Fiber implementation
+        # needs no assembler, sidestepping fcontext arch detection entirely.
+        set(_context_impl_line "-DBOOST_CONTEXT_IMPLEMENTATION:STRING=winfib")
+        message(STATUS "BOOST param: ${_context_impl_line}")
+    elseif (_msvc_target_arch STREQUAL "X64")
+        # Pin arch AND abi: Boost.Context otherwise sniffs the HOST processor,
+        # so building x64 deps on an ARM64 host selects armasm/aapcs and fails
+        # (x86_64 + aapcs has no asm source; the x64 Windows ABI is 'ms').
+        set(_context_abi_line "-DBOOST_CONTEXT_ABI:STRING=ms")
+        set(_context_arch_line "-DBOOST_CONTEXT_ARCHITECTURE:STRING=x86_64")
+        message(STATUS "BOOST param: ${_context_abi_line} ${_context_arch_line}")
     endif ()
 endif ()
 
