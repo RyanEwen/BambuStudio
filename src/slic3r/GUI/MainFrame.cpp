@@ -4175,7 +4175,9 @@ void MainFrame::request_select_tab(TabPosition pos)
 }
 
 int MainFrame::get_calibration_curr_tab() {
-    if (m_calibration)
+    // get_tabpanel() is null until the Calibration panel is first shown (its
+    // contents are built lazily); treat "not built yet" as no selection.
+    if (m_calibration && m_calibration->get_tabpanel())
         return m_calibration->get_tabpanel()->GetSelection();
     return -1;
 }

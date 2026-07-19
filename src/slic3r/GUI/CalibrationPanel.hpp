@@ -109,6 +109,9 @@ public:
 protected:
     void init_tabpanel();
     void init_timer();
+    // Builds the (Win32-HWND-heavy) tab contents on first show, keeping this
+    // off the startup critical path. Safe to call repeatedly.
+    void ensure_initialized();
     void on_timer(wxTimerEvent& event);
 
 
@@ -120,7 +123,7 @@ protected:
     SideTools*              m_side_tools{ nullptr };
     Tabbook*                m_tabpanel{ nullptr };
     SelectMObjectPopup      m_mobjectlist_popup;
-    CalibrationWizard*      m_cali_panels[CALI_MODE_COUNT];
+    CalibrationWizard*      m_cali_panels[CALI_MODE_COUNT] {};
     wxTimer*                m_refresh_timer = nullptr;
 };
 }} // namespace Slic3r::GUI

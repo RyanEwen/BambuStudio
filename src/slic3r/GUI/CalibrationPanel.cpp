@@ -453,12 +453,22 @@ CalibrationPanel::CalibrationPanel(wxWindow* parent, wxWindowID id, const wxPoin
 {
     SetBackgroundColour(*wxWHITE);
 
-    init_tabpanel();
+    // Defer the expensive tab construction (dozens of Win32 controls) until the
+    // panel is first shown - Calibration is not the startup tab, so building it
+    // eagerly needlessly lengthens launch. Until then this panel is a valid but
+    // empty shell; every method that touches the deferred widgets early-returns
+    // while m_initialized is false, and Show() builds it on demand.
+    SetSizer(new wxBoxSizer(wxVERTICAL));
+}
 
-    wxBoxSizer* sizer_main = new wxBoxSizer(wxVERTICAL);
-    sizer_main->Add(m_tabpanel, 1, wxEXPAND, 0);
+void CalibrationPanel::ensure_initialized()
+{
+    if (m_initialized)
+        return;
 
-    SetSizerAndFit(sizer_main);
+    init_tabpanel();  // sets m_initialized = true
+
+    GetSizer()->Add(m_tabpanel, 1, wxEXPAND, 0);
     Layout();
 
     init_timer();
@@ -513,6 +523,7 @@ void CalibrationPanel::on_timer(wxTimerEvent& event) {
 }
 
 void CalibrationPanel::update_print_error_info(int code, std::string msg, std::string extra) {
+    if (!m_initialized) return;
     // update current wizard only
     int curr_selected = m_tabpanel->GetSelection();
     if (curr_selected >= 0 && curr_selected < CALI_MODE_COUNT) {
@@ -533,6 +544,7 @@ void CalibrationPanel::update_print_error_info(int code, std::string msg, std::s
 }
 
 void CalibrationPanel::update_all() {
+    if (!m_initialized) return;
 
     NetworkAgent* m_agent = wxGetApp().getAgent();
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
@@ -649,6 +661,7 @@ void CalibrationPanel::show_status(int status)
 
 bool CalibrationPanel::Show(bool show) {
     if (show) {
+        ensure_initialized();
         m_refresh_timer->Stop();
         m_refresh_timer->SetOwner(this);
         m_refresh_timer->Start(REFRESH_INTERVAL);
@@ -668,7 +681,10 @@ bool CalibrationPanel::Show(bool show) {
 
     }
     else {
-        m_refresh_timer->Stop();
+        // m_refresh_timer is only created once the panel is first shown; a hide
+        // before that (the notebook hides non-active pages at startup) must not
+        // dereference it.
+        if (m_refresh_timer) m_refresh_timer->Stop();
     }
     return wxPanel::Show(show);
 }
@@ -701,6 +717,7 @@ void CalibrationPanel::set_default()
 
 void CalibrationPanel::msw_rescale()
 {
+    if (!m_initialized) return;
     for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
         m_cali_panels[i]->msw_rescale();
     }
@@ -708,13 +725,17 @@ void CalibrationPanel::msw_rescale()
 
 void CalibrationPanel::on_sys_color_changed()
 {
+    if (!m_initialized) return;
     for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
         m_cali_panels[i]->on_sys_color_changed();
     }
 }
 
 CalibrationPanel::~CalibrationPanel() {
-    m_side_tools->get_panel()->Disconnect(wxEVT_LEFT_DOWN, wxMouseEventHandler(CalibrationPanel::on_printer_clicked), NULL, this);
+    // m_side_tools is only created when the panel is first shown (contents are
+    // built lazily); if it was never shown there is nothing to disconnect.
+    if (m_side_tools)
+        m_side_tools->get_panel()->Disconnect(wxEVT_LEFT_DOWN, wxMouseEventHandler(CalibrationPanel::on_printer_clicked), NULL, this);
     if (m_refresh_timer)
         m_refresh_timer->Stop();
     delete m_refresh_timer;
