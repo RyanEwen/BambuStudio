@@ -25,6 +25,7 @@
 #include <exception>
 #include <cstdlib>
 #include <chrono>
+#include <future>
 #include <regex>
 #include <thread>
 #include <string_view>
@@ -3360,12 +3361,33 @@ bool GUI_App::on_init_inner()
     Slic3r::Http::set_extra_headers(extra_headers);
 
     copy_network_if_available();
-    on_init_network();
+    // Load the network module (plugin DLL load plus Authenticode validation)
+    // on a worker thread so its ~4s cost overlaps preset loading below. Only
+    // the module load runs here; it touches no wx, no app_config and no preset
+    // state, and creates no agent or callbacks. The cert-config flag is read on
+    // this (main) thread and captured by value to avoid touching app_config
+    // from the worker while load_presets uses it. The agent itself is created
+    // by on_init_network_finish on the main thread, before the MainFrame, so
+    // the agent-availability contract for the rest of init is unchanged.
+    const bool _net_validate_cert = !app_config->get_bool("ignore_module_cert");
+    std::future<int> _init_network_future = std::async(std::launch::async, [_net_validate_cert] {
+        return Slic3r::NetworkAgent::initialize_network_module(false, _net_validate_cert);
+    });
 
-    if (m_agent && m_agent->is_user_login()) {
-        enable_user_preset_folder(true);
-    } else {
-        enable_user_preset_folder(false);
+    // The network agent is still loading on a worker thread (started above), so
+    // its login state is not available yet. Decide the user preset folder from
+    // the value persisted last session instead: app_config's "preset_folder" is
+    // written on every login/logout, so before any login change can occur this
+    // startup it already holds the authoritative user id (or empty when logged
+    // out / first run). This reproduces enable_user_preset_folder's effect
+    // without needing the live agent, so load_presets below still loads the
+    // right user presets. Runtime login changes remain handled as before.
+    {
+        const std::string persisted_user = app_config->get("preset_folder");
+        if (!persisted_user.empty())
+            preset_bundle->update_user_presets_directory(persisted_user);
+        else
+            preset_bundle->update_user_presets_directory(DEFAULT_USER_FOLDER_NAME);
     }
 
     // BBS if load user preset failed
@@ -3382,6 +3404,12 @@ bool GUI_App::on_init_inner()
         catch (const std::exception& ex) {
             show_error(nullptr, ex.what());
         }
+
+    // Join the network module load started before preset loading, then create
+    // the agent and managers on the main thread (as the original synchronous
+    // on_init_network did) so everything downstream, including the MainFrame,
+    // sees a fully initialized agent.
+    on_init_network_finish(_init_network_future.get());
     //}
 
 #ifdef WIN32
@@ -3636,7 +3664,12 @@ void GUI_App::copy_network_if_available()
 
 bool GUI_App::on_init_network(bool try_backup)
 {
-    int  load_agent_dll       = Slic3r::NetworkAgent::initialize_network_module(false, !app_config->get_bool("ignore_module_cert"));
+    int load_agent_dll = Slic3r::NetworkAgent::initialize_network_module(false, !app_config->get_bool("ignore_module_cert"));
+    return on_init_network_finish(load_agent_dll, try_backup);
+}
+
+bool GUI_App::on_init_network_finish(int load_agent_dll, bool try_backup)
+{
     bool create_network_agent = false;
 __retry:
     if (!load_agent_dll) {

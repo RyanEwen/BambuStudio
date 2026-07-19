@@ -787,6 +787,11 @@ private:
     bool            on_init_inner();
     void            copy_network_if_available();
     bool            on_init_network(bool try_backup = false);
+    // Second half of on_init_network, taking the already-computed result of
+    // NetworkAgent::initialize_network_module so that load can run on a worker
+    // thread (see on_init_inner). Creates the agent and managers; call on the
+    // main thread.
+    bool            on_init_network_finish(int load_agent_dll, bool try_backup = false);
     void            init_networking_callbacks();
     void            init_app_config();
     void            remove_old_networking_plugins();
